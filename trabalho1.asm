@@ -8,7 +8,7 @@ digite_operador: .asciz "digita o operador:"
 barra_ene: .asciz "\n "
 digite_numero: .asciz "digite o outro numero:"
 digite_primeiro_numero: .asciz "digite o primeiro numero:"
-resultado_e: .asciz "o resultado é:"
+str_o_resultado_e: .asciz "o resultado é:"
 .text
 .globl main
 
@@ -90,11 +90,13 @@ operacao:
     li t1, '/'
     beq t4, t1, divisao
 atualiza_resultado:	
+# coloca o que estiver em a0 no resultado, portanto, para ser chamada, precisa que o resultado esteja em a0
+
     add t2, zero, a0
-    la a0, resultado_e
+    la a0, str_o_resultado_e
     addi a7, zero, 4
     ecall
-    #depende de que o resultado esteja em t2 (por algum motivo)
+
     la t1, resultado
     sw t2, 0(t1) # armazena resultado 
     
@@ -127,12 +129,14 @@ divisao:
     j atualiza_resultado
 # ------nao comandos
 undo:
-    #nao quer parametros 
+    #nao requer parametros 
     lw t1, ponteiro_topo_lista
-    
-    addi t3, zero -1
+
+    #compara o ponteiro pro anterior com -1, no caso em que nao tem resultado anterior, 
+    #o ponteiro é -1, portanto ele só vai carregar o resultado atual em resultado, no lugar de voltar no anterior
+    addi t3, zero, -1
     la t2, resultado
-    lw a0, 0(t2)
+    lw a0, 0(t2) #armazena o resultado atual em a0 pq a funcao atualiza resultado pede isso
     beq t1, t3, atualiza_resultado
     
     la t1, ponteiro_topo_lista
