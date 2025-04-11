@@ -1,190 +1,204 @@
 .data
 resultado:  .word 0   
 ponteiro_topo_lista:  .word -1
-operador:   .byte 0 # guarda o operador atual
 msg_erro:   .asciz "Entrada inválida!\n"
-msg_memoria:.asciz "Erro de alocação de memória. encerrando o programa\n"
 digite_operador: .asciz "digita o operador:"
 barra_ene: .asciz "\n "
 digite_numero: .asciz "digite o outro numero:"
+nao_pd_zero: .asciz "não pode ser 0\n"
 digite_primeiro_numero: .asciz "digite o primeiro numero:"
-str_o_resultado_e: .asciz "o resultado é:"
+resultado_e: .asciz "o resultado é:"
 .text
+.align 2
 .globl main
 
 main: 
-    la a0, digite_primeiro_numero
-    addi a7, zero, 4
-    ecall
-
-
-    # lê o primeiro numero na inicialização
-    li a7, 5 # serviço para ler int
-    ecall
-    
-    # guardo a primeira entrada em resultado
-    la t1, resultado 
-    sw a0, 0(t1)
-    #esta guardado em t1 o inteiro lido
+	la a0,digite_primeiro_numero #carrega string para printar
+	li a7,4 #syscall para printar string
+	ecall
+	
+	li a7,5 #syscall para ler int
+	ecall
+	la s0, resultado #carrega endereço em que será armazenado o resultado
+	sw a0,0(s0) #salva o primeiro operando digitado como primeiro resultado
+	
 loop_calculadora:
+	li a7, 4 #syscall para printar string
+	la a0, digite_operador #carrega string para printar
+	ecall 
+	
+	#leitura do caracter da operação ou comando
+	li a7,12 #syscall para leitura de char
+	ecall
+	
+	#armazena o operador em t0
+	mv t0,a0
 
-    jal printar_digite_operador
-    # lê o operador (ou comando 'u' ou 'f')
-    li a7, 12 # serviço para ler char
-    ecall
-    
-    addi t1, a0, 0
-    ecall # essa ecall a mais é para "eliminar" o \n
-    addi  a0, t1, 0 # por causa do ultimo ecall, eu faço isso aqui para colocar a operação no a0 denovo (porque senao seria só o \n nele)
-    
-    la t6, operador
-    sb a0, 0(t6) 
+	#printa quebra de linha
+	la a0,barra_ene
+	li a7,4
+	ecall
 
+	#se for 'f' finaliza o programa
+	li t1,'f'
+	beq t0, t1,finalizar 
+	#se for 'u' realiza o undo
+	li t1,'u'
+	beq t0,t1,undo
+	
 
-
-    # verifica se é comando
-    li t0, 'f'
-    beq t1, t0, finalizar
-    li t0, 'u'
-    beq t1, t0, undo
-    
-    #ele adiciona na pilha só apos verificar se é comando pois se for, o numero digitado não conta como resultado anterior, se fizesse isso antes, o undo ia sempre voltar no meso
-    jal adicionar_resultado_na_pilha
-    
-    # verifica se é operador válido
-    li t0, '+'
-    beq t1, t0, operacao
-    li t0, '-'
-    beq t1, t0, operacao
-    li t0, '*'
-    beq t1, t0, operacao
-    li t0, '/'
-    beq t1, t0, operacao
-     
-    j entrada_invalida
-    
-operacao:
-    
-    la a0, digite_numero
-    addi a7, zero, 4
-    ecall
-    
-    # lê o proximo int
-    li a7, 5            
-    ecall
-    addi t3, a0, 0 # t3 = novo número 
-    
-    
-    la t1, resultado
-    lw t2, 0(t1) # carrega o acumulador (resultado)
-    la t1, operador
-    lb t4, 0(t1) # pega o operador
-    
-    # decide a operação
-    li t1, '+'
-    beq t4, t1, soma
-    li t1, '-'
-    beq t4, t1, subtracao
-    li t1, '*'
-    beq t4, t1, multiplicacao
-    li t1, '/'
-    beq t4, t1, divisao
-atualiza_resultado:	
-# coloca o que estiver em a0 no resultado, portanto, para ser chamada, precisa que o resultado esteja em a0
-
-    add t2, zero, a0
-    la a0, str_o_resultado_e
-    addi a7, zero, 4
-    ecall
-
-    la t1, resultado
-    sw t2, 0(t1) # armazena resultado 
-    
-    # para printar o resultado
-    li a7, 1 
-    add a0, zero, t2
-    ecall
-    
-    la a0, barra_ene
-    addi a7, zero, 4
-    ecall
-    
-    j loop_calculadora
-
-# operações ----------
-soma:
-    add a0, t2, t3
-    j atualiza_resultado
-
-subtracao:
-    sub a0, t2, t3
-    j atualiza_resultado
-
-multiplicacao:
-    mul a0, t2, t3
-    j atualiza_resultado
-
-divisao:
-    div a0, t2, t3 # divisão inteira
-    j atualiza_resultado
-# ------nao comandos
-undo:
-    #nao requer parametros 
-    lw t1, ponteiro_topo_lista
-
-    #compara o ponteiro pro anterior com -1, no caso em que nao tem resultado anterior, 
-    #o ponteiro é -1, portanto ele só vai carregar o resultado atual em resultado, no lugar de voltar no anterior
-    addi t3, zero, -1
-    la t2, resultado
-    lw a0, 0(t2) #armazena o resultado atual em a0 pq a funcao atualiza resultado pede isso
-    beq t1, t3, atualiza_resultado
-    
-    la t1, ponteiro_topo_lista
-    lw t2, 0(t1) # t2 é um ponteiro pro começo do ultimo item da lista
-    #precisamos por o ponteiro da lista pra apontar pro anterior 
-    lw t3, 0(t2)
-    sw t3, 0(t1)
-    #ponteiro_topo_lista = primeiros 4 bytes do endereco apontado por ele
-    #falta guardar o resultado anterior em resultado
-    lw a0, 4(t2) #pronto, atualiza resultado guarda em resultado o que estiver em t2, por algum motivo
-    
-    # aqui nos dá um jeito de implementar o undo com os ponteiros	
-    j atualiza_resultado
-
-entrada_invalida:
-    li a7, 4
-    la a0, msg_erro
-    ecall
-    j loop_calculadora
-
-printar_digite_operador:
-    addi a7, zero, 4
-    la a0, digite_operador
-    ecall
-    jr ra
+	#adiciona na pilha caso não for comando u ou f
+	jal adicionar_resultado_na_pilha
+	
+	#soma
+	li t1,'+'
+	beq t0,t1,soma	
+	#subtração
+	li t1,'-'
+	beq t0,t1,subtracao	
+	#multiplicação
+	li t1,'*'
+	beq t0,t1,multiplicacao	
+	#divisão
+	li t1,'/'
+	beq t0,t1,divisao	
+	#caso não atenda a nenhum dos outros caso vai ao caso de entrada invalida
+	jal entrada_invalida
 
 finalizar:
-    li a7, 10
+	#encerra o programa
+	li a7,10
+	ecall
+
+undo:
+	#carrega em t1 o ponteiro de topo da lista
+	lw t1,ponteiro_topo_lista
+	#armazena -1 em t2 para utilizar o valor
+	addi t2,zero,-1
+	#caso a pilha esteja vazia(ponteiro valor -1) não faz alteração nela
+	beq t1,t2, printa_resultado
+
+	#armazena o endereço do ponteiro do topo da lista em t1
+	la t1,ponteiro_topo_lista
+	#armazena em t2 o valor do ponteiro do topo da lista
+	lw t2,0(t1) 
+	#carrega em t3 o valor do ponteiro para o penúltimo nó adicionado
+	lw t3,0(t2)
+	#torna o penúltimo nó o mais recente(topo da pilha)
+	sw t3,0(t1)
+	#armazena o resultado novo em a0
+	lw a0,4(t2)
+	j atualiza_resultado
+
+
+
+soma:
+	#chama função para realizar os procedimentos comuns a todas operações
+	jal operacao
+	lw t2,0(s0) #carrega o resultado anterior em t2
+	add a0,t2,t0 #a0 = t2(resultado velho) + t0(operando)
+	j atualiza_resultado
+
+subtracao:
+	jal operacao #função comum
+	lw t2,0(s0) #carrega o resultado anterior em t2
+	sub a0,t2,t0 #a0 = t2(resultado velho) - t0(operando)
+	j atualiza_resultado
+
+multiplicacao:
+	jal operacao #função comum
+	lw t2,0(s0) #carrega o resultado anterior em t2
+	mul a0,t2,t0 #a0 = t2(resultado velho) * t0(operando)
+	j atualiza_resultado
+
+caso0:#caso tente fazer divisão por 0 
+	la a0,nao_pd_zero
+	li a7,4 
+	ecall
+
+divisao:
+	jal operacao #função comum
+	beq a0,zero,caso0 #verifica se é divisao por 0
+	lw t2,0(s0) #carrega o resultado anterior em t2
+	div a0,t2,t0 #a0 = t2(resultado velho) / t0(operando)
+	j atualiza_resultado
+
+operacao:
+	#printa a mensagem
+	la a0, digite_numero
+    li a7, 4
     ecall
     
+    # lê o proximo int para a operação
+    li a7, 5            
+    ecall
+
+	#armazena o numero em t0
+	mv t0,a0
+
+	#printa quebra de linha 
+	la a0,barra_ene
+	li a7,4
+	ecall
+	
+	#retorna da função
+	jr ra
+
+atualiza_resultado:
+	#armazena o endereço de resultado em t1
+	la t1, resultado
+	#atualiza o resultado
+	sw a0,0(t1)
+printa_resultado:
+	#armazena em t2 o último resultado
+	lw t2,resultado
+	#printa "o resultado eh"
+	la a0,resultado_e
+	li a7,4
+	ecall
+
+	#printa o resultado
+	addi a0,t2,0
+	li a7,1
+	ecall
+
+	#printa \n
+	la a0,barra_ene
+	li a7,4
+	ecall
+	j loop_calculadora
+
 adicionar_resultado_na_pilha:
-    #adiciona nos aqui vvvvvvvv
-    
-    # DEPENDE DE RESULTADO ARMAZENAR O RESULTADO
-    
-    addi a0, zero, 8 #o tamanho de cada no da lista é 8 (o ponterio pro anterior e o resultado)
-    addi a7, zero, 9
-    ecall
-    
-    lw t2, ponteiro_topo_lista
-    sw t2, 0(a0) #armazena o ponteiro pro ultimo na vaga pro ponteiro pro anterior
-    lw t2, resultado
-    sw t2, 4(a0) #armazena o resultado na vaga pro resultado
-    la t2, ponteiro_topo_lista
-    sw a0, 0(t2)
-    
-    #adicionar nos aqui ^^^^^^^^^
-    jr ra
-    
-# progresso ate o momento: as entradas estao funcionando show da bola e as operaçoes tao sendo feitas bem. basicamente é a calculadora sem o undo
-# agora é fazer a parte dificil só rsrs
+	#syscall para alocar memória
+	li a7,9
+	#número de bits a serem alocados(2 words: um ponteiro e um valor)
+	li a0,8
+	ecall
+	#a0 passa a armazenar o endereço da memória alocada
+
+	#carrega o ponteiro do topo da lista t2
+	lw t2,ponteiro_topo_lista
+	#armazena no novo nó o ponteiro do antigo topo
+	sw t2,0(a0)
+	#carrega em t2 o último resultado
+	lw t2,resultado
+	#armazena no novo nó o último resultado
+	sw t2,4(a0)
+	#carrega em t2 o endereço para o ponteiro do topo da pilha
+	la t2, ponteiro_topo_lista
+	#autualiza o ponteiro do topo da lista para o endereço do novo no
+	sw a0,0(t2)
+	#retorna da função
+	jr ra
+
+entrada_invalida:
+	#printa mensagem de erro
+	li a7, 4
+	la a0, msg_erro
+	ecall
+	#faz novamente o loop da calculadora
+	j loop_calculadora
+    	
+    	
+    	
+    	
